@@ -29,27 +29,40 @@
 9 3 2 2 3.68
 10 4 1 1 0.14
 #Number of concentrated non structural masses
-1
+3
 #concentrated mass properties
 #id	mass	node
-1 0 1
+1 0.125 1
+2 0.043 3
+3 0.016 5
+#Number of non-structural mass cases
+2
+#Mass case properties
+#id	conc_mass_ids	
+1 1 2 3
+2 2 3
 #Number of static force cases
-1
+2
 #force case properties
 #id	forces(zeros for unloaded dofs or non zero for forces in that direction and node)
 1 0 0 0 -100000 0 0 0 -100000 0 0 0 0
+1 0 0 0 -200000 0 0 0 -200000 0 0 0 0
 #Number of Boundary condition sets
 1
 #boundary condition set properties
 #id	boundary_condition(free 1 or constrained 0)
 1 1 1 1 1 1 1 1 1 0 0 0 0
 #Number of static load cases
-1
+2
 #static load case properties
 #id	forcevector_index	boundary_condition_case		
 1 1 1
+2 2 1
 #Number of natural vibrations cases
-1
+2
 #dynamic load case properties
-#id	boundary_condition_case	number_lowest_frequencies
-1 1 2
+#id	boundary_condition_case	mass_case	number_lowest_frequencies
+1 1 1 2
+2 1 1 3
+#Should analytic sensitivities for dynamic cases be computed (1 if yes, 0 if no)
+1

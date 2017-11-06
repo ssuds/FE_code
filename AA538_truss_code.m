@@ -3,71 +3,8 @@
 %Clearing all previous data in workspace
 clear; 
 
-%% Input file (This is stored externally as input.txt but shown here for reference)
-
-%%
-% 
-% 
-% 
-% 
-% 
-%  #Number of nodes
-%  6
-%  #Coordinates of nodes
-%  #id	x	y
-%  1 720 360
-%  2 720 0
-%  3 360 360
-%  4 360 0
-%  5 0 360
-%  6 0 0
-%  #Number of materials
-%  2
-%  #Material Properties
-% #id	E	sigma_yt	sigma_yc	rho
-% 1 10000000 25000 25000 0.1
-% 2 10000000 75000 75000 0.1
-% #Number of elements
-% 10
-% #element properties
-% #element_id	id_node1	id_node2	id_material	A
-% 1 5 3 1 7.90
-% 2 3 1 1 0.10
-% 3 6 4 1 8.10
-% 4 4 2 1 3.90
-% 5 3 4 1 0.10
-% 6 1 2 1 0.10
-% 7 5 4 1 5.80
-% 8 6 3 1 5.51
-% 9 3 2 2 3.68
-% 10 4 1 1 0.14
-% #Number of concentrated non structural masses
-% 1
-% #concentrated mass properties
-% #id	mass	node
-% 1 0 1
-% #Number of static force cases
-% 1
-% #force case properties
-% #id	forces(zeros for unloaded dofs or non zero for forces in that direction and node)
-% 1 0 0 0 -100000 0 0 0 -100000 0 0 0 0
-% #Number of Boundary condition sets
-% 1
-% #boundary condition set properties
-% #id	boundary_condition(free 1 or constrained 0)
-% 1 1 1 1 1 1 1 1 1 0 0 0 0
-% #Number of static load cases
-% 1
-% #static load case properties
-% #id	forcevector_index	boundary_condition_case		
-% 1 1 1
-% #Number of natural vibrations cases
-% 1
-% #dynamic load case properties
-% #id	boundary_condition_case	number_lowest_frequencies
-% 1 1 2
-
-
+%% Contents of input deck
+type input.txt;
 
 %% Inputs for global stiffness and structural mass matrices
 
@@ -136,7 +73,7 @@ clear k; %clears out the id variable so that it doesnt mess with indexing later
 
 
 %% Creation of global stiffness & structural mass matrices
-% Step 1
+% Step 1: Define the degrees of freedom and associate each dof with a node and a direction
 
 %Define degrees of freedom (2 times the number of nodes for our 2d anal)
 n_dof = Nnodes*2;
@@ -152,7 +89,7 @@ end
 clear i; %clears out the id variable so that it doesnt mess with indexing later
 
 %%
-% Step 2
+% Step 2: Allocate memory for the global stiffness and mass matrices for the structure: [Kglobal],[Mglobal], initiate these matrices by setting all their elements to zero.
 
 %initialize global stiffness matrix
 Kglobal = zeros(n_dof,n_dof);
@@ -166,10 +103,18 @@ Mglobal = zeros(n_dof,n_dof);
 clear temp_ar;
 temp_ar(1:(n_dof/2))=2;
 Mglobal_sectioned = mat2cell(Mglobal,temp_ar,temp_ar);
+%initialize dK_dA cell matrix, which will hold the d[K]/dA used in computing analytic sensitivities for each element
+dK_dA = cell(Nelements,1);
+%initialize dM_dA cell matrix, which will hold the d[M]/dA used in computing analytic sensitivities for each element
+dM_dA = cell(Nelements,1);
 %%
 % Step 3
 %initialize empty c matrix
 c = zeros(Nelements,n_dof);
+
+l = zeros(Nelements,1); %initialize empty length matrix to store lengths of each element
+E = zeros(Nelements,1); %initialize empty matrix to store E of each element
+A = zeros(Nelements,1); %intiialize empty matrix to store A of each element
 for iel=1:Nelements
 %find ids of node 1 and node 2 that the element connects from elements
 %matrix
@@ -181,32 +126,40 @@ node_1y = nodes(node_1,2);
 node_2x = nodes(node_2,1);
 node_2y = nodes(node_2,2);
 %calculate length of element 
-l = sqrt((node_2y-node_1y)^2+(node_2x-node_1x)^2);
+l_el = sqrt((node_2y-node_1y)^2+(node_2x-node_1x)^2);
+l(iel,1) = l_el; %store length of this element in the l vector
 %calculate the angle the line from node 1 to node 2 creates with the
 %global x axis
 theta=atan2(node_2y-node_1y,node_2x-node_1x);
 %Find the id_material for the element
 id_material = elements(iel,3);
 %Find material properties based on the id_material
-E=materials(id_material,1);
+E_el=materials(id_material,1);
+E(iel,1) = E_el; %store E of this element in the E vector
 rho=materials(id_material,4);
 %Find the cross sectional area of the element A-iel
-A = elements(iel,4);
+A_el = elements(iel,4);
+A(iel,1) = A_el;
 %Find the volume of the element A-iel * L-iel (note: the –iel is an index
 %not a subtraction)
-V = A*l;
+V = A_el*l_el;
 %Find the mass of the element m-iel=elementMaterialDensity*elementVolume
 m=rho*V;
 %generate the local stiffness matrix for the element
 %note that A is multiplied in after the fact to streamline the code when
 %optimization is in play
+
+dK_dAglobal = zeros(n_dof,n_dof); %initialize the global d[K]/dA matrix which is used for analytic sensitivities
+dK_dAglobal_sectioned = mat2cell(dK_dAglobal,temp_ar,temp_ar); %Section dK/dA matrix into 2x2 sections
+
 Kellocal = zeros(4,4);
 Kellocal(1,1) = 1;
 Kellocal(3,1) = -1;
 Kellocal(1,3) = -1;
 Kellocal(3,3) = 1;
-Kellocal = (E/l).*Kellocal;
-Kellocal = A.*Kellocal;
+Kellocal = (E_el/l_el).*Kellocal;
+dK_dAlocal = Kellocal; %Generate the element contribution to the global dK/dA matrix
+Kellocal = A_el.*Kellocal;
 %generate the transformation matrix for the element
 T = zeros(4,4);
 T_2x2 = zeros(2,2);
@@ -223,6 +176,7 @@ T_sectioned{2,2} = T_2x2;
 T=cell2mat(T_sectioned);
 %Find the 4 x 4 element stiffness matrix in global coordinates [KelGlobal]=[Ttranspose][KelLocal][T]
 Kelglobal = transpose(T)*Kellocal*T;
+dK_dAelglobal = transpose(T)*dK_dAlocal*T; %transform the element dK/dA matrix to the global coordinate system
 %Identify the 2 dofs associated with node 1 of the element
 dof_node1_index = find(dof_index(:,2)==node_1); %find all instances of node_1 id within the node column of the dof_index matrix
 dof1_node1 = dof_index(dof_node1_index(1),1); %identify first dof associated with node 1
@@ -233,6 +187,7 @@ dof1_node2 = dof_index(dof_node2_index(1),1); %identify first dof associated wit
 dof2_node2 = dof_index(dof_node2_index(2),1); %identify second dof associated with node 2
 %Partition [KelGlobal] into 4 2 x 2 matrices
 Kelglobal_sectioned = mat2cell(Kelglobal,[2 2],[2 2]);
+dK_dAelglobal_sectioned = mat2cell(dK_dAelglobal,[2 2],[2 2]); %partition the dK/dA for the element in the same way
 %Add element global stiffness matrix to global stiffness matrix in the
 %correct locations
 Kglobal_sectioned{node_1,node_1} = Kglobal_sectioned{node_1,node_1} + Kelglobal_sectioned{1,1};
@@ -240,22 +195,48 @@ Kglobal_sectioned{node_1,node_2} = Kglobal_sectioned{node_1,node_2} + Kelglobal_
 Kglobal_sectioned{node_2,node_1} = Kglobal_sectioned{node_2,node_1} + Kelglobal_sectioned{2,1};
 Kglobal_sectioned{node_2,node_2} = Kglobal_sectioned{node_2,node_2} + Kelglobal_sectioned{2,2};
 
+%position dK_dA element into global coordinates for the element DOFs
+dK_dAglobal_sectioned{node_1,node_1} = dK_dAelglobal_sectioned{1,1};
+dK_dAglobal_sectioned{node_1,node_2} = dK_dAelglobal_sectioned{1,2};
+dK_dAglobal_sectioned{node_2,node_1} = dK_dAelglobal_sectioned{2,1};
+dK_dAglobal_sectioned{node_2,node_2} = dK_dAelglobal_sectioned{2,2};
+
+%Rebuild dK_dAglobal from sectioned matrix
+dK_dAglobal = cell2mat(dK_dAglobal_sectioned);
+
+%Store the dK_dA in the overall dK_dA cell array corresponding to the element it is associated to 
+dK_dA{iel} = dK_dAglobal;
+
 %initialize an element mass matrix
 Melglobal = zeros(4,4);
+dM_dAglobal = zeros(n_dof,n_dof); %initialize the global d[M]/dA matrix which is used for analytic sensitivities
+dM_dAglobal_sectioned = mat2cell(dM_dAglobal,temp_ar,temp_ar); %Section dM/dA matrix into 2x2 sections
+
 %adding the element mass to the diagonal of the element mass matrix,
 %corresponding to the 4 DOFs for n1 and n2 that the element connects
-Melglobal(1,1) = m/2;
-Melglobal(2,2) = m/2;
-Melglobal(3,3) = m/2;
-Melglobal(4,4) = m/2;
+Melglobal = diag([1 1 1 1]);
+dM_dAelglobal = ((rho*l_el)/2).*Melglobal; %Generate the element contribution to the global dM/dA matrix
+Melglobal = m/2.*Melglobal;
 %Partition [Melglobal] into 4 2 x 2 matrices
 Melglobal_sectioned = mat2cell(Melglobal,[2 2],[2 2]);
-%adding the element mass matrix into the global mass matrix in correct
-%location
+dM_dAelglobal_sectioned = mat2cell(dM_dAelglobal, [2 2],[2 2]);
+%adding the element mass matrix into the global mass matrix in correct location
 Mglobal_sectioned{node_1,node_1} = Mglobal_sectioned{node_1,node_1} + Melglobal_sectioned{1,1};
 Mglobal_sectioned{node_1,node_2} = Mglobal_sectioned{node_1,node_2} + Melglobal_sectioned{1,2};
 Mglobal_sectioned{node_2,node_1} = Mglobal_sectioned{node_2,node_1} + Melglobal_sectioned{2,1};
 Mglobal_sectioned{node_2,node_2} = Mglobal_sectioned{node_2,node_2} + Melglobal_sectioned{2,2};
+
+%adding the element mass sensitivity matrix into the global mass sensitivity matrix in correct location
+dM_dAglobal_sectioned{node_1,node_1} = dM_dAelglobal_sectioned{1,1};
+dM_dAglobal_sectioned{node_1,node_2} = dM_dAelglobal_sectioned{1,2};
+dM_dAglobal_sectioned{node_2,node_1} = dM_dAelglobal_sectioned{2,1};
+dM_dAglobal_sectioned{node_2,node_2} = dM_dAelglobal_sectioned{2,2};
+
+%Rebuild dMdAglobal from sectioned matrix
+dM_dAglobal = cell2mat(dM_dAglobal_sectioned);
+
+%Store the dK_dA in the overall dK_dA cell array corresponding to the element it is associated to 
+dM_dA{iel} = dM_dAglobal;
 
 %create temporary c vector
 c_vectemp = zeros(1,n_dof);
@@ -305,28 +286,54 @@ for i=1:NconcM
  concmasses(temp_ar(1),1:2)=temp_ar(2:3); %saves the temporary array to the id'th row of the concmasses matrix
 end
 clear i; %clears out the id variable so that it doesnt mess with indexing later
-%%
-%Step 4
-%Add the concentrated masses to the global mass matrix
-for p=1:NconcM
-%find the mass value 
-Mp = concmasses(p,1);
-%find the node the mass is located at
-nodep = concmasses(p,2);
-%find the associated degrees of freedom for the node
-dof_node1_index = find(dof_index(:,2)==nodep); %find all instances of nodep id within the node column of the dof_index matrix
-i1 = dof_index(dof_node1_index(1),1); %identify first dof associated with node
-i2 = dof_index(dof_node1_index(2),1); %identify second dof associated with node
-%add the concentrated masses to the appropriate DOFs
-Mglobal(i1,i1)=Mglobal(i1,i1)+Mp;
-Mglobal(i2,i2)=Mglobal(i2,i2)+Mp;
-end
 
-%% Forces and Boundary Conditions
+%% HW2 part a) Add mass matrix generation
 
 %read over the next two lines, the first which is not used for
 %anything other than formatting and last being the one we want
 temp_str=fgetl(fid);
+temp_str=fgetl(fid);
+
+%Read in Number of mass case sets as an integer
+Nmasscases = fscanf(fid,'%i',1);
+
+%read over the next three lines, the first two which are not used for
+%anything other than formatting and third last being the one we want
+temp_str=fgetl(fid);
+temp_str=fgetl(fid);
+temp_str=fgetl(fid);
+
+%read in the concentrated masses in each mass case and save in the array
+masscases={1,1:Nmasscases}; %initialize the masscases cell array
+Mglobal_masscases = cell(Nmasscases,1); %initialize a cell array to store the global mass matrix for each set of concentrated mass cases
+Mglobal_backup = Mglobal; %initialize a backup global mass matrix 
+for i=1:Nmasscases
+ temp_str=fgetl(fid); %reads in each mass case line into a temporary string 
+ temp_ar=sscanf(temp_str,'%f',NconcM+1); %breaks the temporary string into an array consisting of its id and all the associated concentrated mass ids
+ masscases{i} = temp_ar(2:end); %places the mass case into the masscases cell array
+    for j=1:length(masscases{i})
+        Mglobal = Mglobal_backup; %Restore the backup of the mass matrix so that each boundary condition can be applied on a virgin mass matrix 
+        %find the mass value 
+        Mj = concmasses(masscases{i}(j),1);
+        %find the node the mass is located at
+        nodej = concmasses(masscases{i}(j),2);
+        %find the associated degrees of freedom for the node
+        dof_node1_index = find(dof_index(:,2)==nodej); %find all instances of nodej id within the node column of the dof_index matrix
+        i1 = dof_index(dof_node1_index(1),1); %identify first dof associated with node
+        i2 = dof_index(dof_node1_index(2),1); %identify second dof associated with node
+        %add the concentrated masses to the appropriate DOFs
+        Mglobal(i1,i1)=Mglobal(i1,i1)+Mj;
+        Mglobal(i2,i2)=Mglobal(i2,i2)+Mj;
+    end 
+ Mglobal_masscases{i}=Mglobal; %Store the global mass matrix corresponding to the i'th mass case set into the mass case matrix cell array
+ end
+clear i; %clears out the id variable so that it doesnt mess with indexing later
+clear j; %clears out the id variable
+
+%% Forces and Boundary Conditions
+
+%read over the next lines, which is not used for
+%anything other than formatting
 temp_str=fgetl(fid);
 
 %Read in Number of force cases as an integer
@@ -343,7 +350,7 @@ temp_str=fgetl(fid);
 forcecases=zeros(Nforcecases,n_dof); %initialize the forcecases array
 for i=1:Nforcecases
  temp_ar=fscanf(fid,'%f',n_dof+1); %reads in each force case into a temporary array consisting of its id and the vector of forces
- forcecases_transpose(temp_ar(1),1:n_dof)=temp_ar(2:n_dof+1); %saves the temporary array to the id'th row of the forcecases matrix
+ forcecases_transpose(i,1:n_dof)=temp_ar(2:n_dof+1); %saves the temporary array to the id'th row of the forcecases matrix
 end
 forcecases = forcecases_transpose'; %takes the transpose of forcecases_transpose so that each column in the forcecases matrix is a force vector
 
@@ -427,7 +434,7 @@ end
 clear i; %clears out the id variable so that it doesnt mess with indexing later
 
 %%
-%Step 6
+%Step 6: create the force input vectors for each static load case
 
 force_inputs = zeros(n_dof,Nstatic); %initialize new matrix of force inputs for load cases 
 force_new = zeros(n_dof,1); %initialize new force vector
@@ -449,10 +456,11 @@ end
 %% Solve the static problem [K]{u}={F}
 
 %%
-%Step 7
+%Step 7: Solve for displacements and stresses in all static load cases
 %find displacements
 u = zeros(n_dof,Nstatic); %initialize displacement matrix to hold displacements for each static load case
 stress_matrix = zeros(Nelements,Nstatic); %initialize stress matrix to hold stresses for each static load case and each element
+dsigma_dA = cell(Nstatic,1); %initialize stress sensitivity matrix to hold stress sensitivity for each static load case and each element
 for ist=1:Nstatic
     ibc = static_load(ist,2); %find the boundary condition set index ibc
     iforce = static_load(ist,1); %find the force set index iforce
@@ -460,6 +468,12 @@ for ist=1:Nstatic
     Kglobal_set = Kglobal_bcs{ibc}; %store the global stiffness matrix corresponding to BC set number ibc 
     u_case = lsqr(Kglobal_set,force); %Solve [K]{u} = {F} for {u}, lsqr function is used since K is sparse
     u(1:n_dof,Nstatic)=u_case; %store the displacement for this load case in the Nstatic column of the displacement matrix
+    
+    %initialize variables to compute and store stress sensitivity for each element
+    dF_dA = zeros(n_dof,1); %compute d{F}/dA - currently initialized as a zero vector as the forces being applied have no dependence on our structural design variables
+    pseudo_load_loadcase = zeros(n_dof,Nelements); %initialize pseudo_load cell array to store pseudo load for each element under this load case
+    du_dA_loadcase = zeros(n_dof,Nelements); %initialize d{u}/dA cell array to store d{u}/dA for each element under this load case
+    dsigma_dA_loadcase = zeros(n_dof,Nelements); %initialize dsigma/dA cell array to store dsigma/dA for each element under this load case
     %find stresses
     stress_vec = zeros(1,Nelements); %initialize stress vector to capture stresses for each element
     for iel=1:Nelements
@@ -467,7 +481,7 @@ for ist=1:Nstatic
     %Find the id_material for the element
     id_material = elements(iel,3);
     %Find material properties based on the id_material
-    E=materials(id_material,1);
+    E_el=materials(id_material,1);
     %find ids of node 1 and node 2 that the element connects from elements
     %matrix
     node_1 = elements(iel,1);
@@ -478,15 +492,20 @@ for ist=1:Nstatic
     node_2x = nodes(node_2,1);
     node_2y = nodes(node_2,2);
     %calculate length of element 
-    l = sqrt((node_2y-node_1y)^2+(node_2x-node_1x)^2);
-    stress = (E/l)*c_element*u_case; %compute stress {c}*{u}
-    stress_vec(iel)= stress; %save the stress for the iel element into the iel'th element of the stress_vec
+    l_el = sqrt((node_2y-node_1y)^2+(node_2x-node_1x)^2);
+    stress = (E_el/l_el)*c_element*u_case; %compute stress {c}*{u}
+    stress_vec(iel) = stress; %save the stress for the iel element into the iel'th element of the stress_vec
+    %compute stress sensitivity for element
+     pseudo_load_loadcase(1:n_dof,iel) = dF_dA-(dK_dA{iel}*u_case); %compute pseudo load for each element
+     du_dA_loadcase(1:n_dof,iel) = lsqr(Kglobal_set,pseudo_load_loadcase(1:n_dof,iel)); %Solve [K]{u} = {F} for {u}, lsqr function is used since K is sparse
+     dsigma_dA_loadcase(1:n_dof,iel) = c_element*du_dA_loadcase(1:n_dof,iel); %compute stress sensitivity for the element NOTE: this should be {c-transpose}*d{u}/dA but it appears one of these is a row vector when it should be a column vector
     end
     stress_matrix(1:Nelements,ist) = stress_vec;
+    dsigma_dA{ist} = dsigma_dA_loadcase;
 end
 
 %% Static solution (Stresses in each element)
-disp('The stresses in each element in PSI are displayed below in order of element number');
+disp('The stresses in each element in PSI are displayed below in order of element number (vertically) and load case (horizontally)');
 disp(stress_matrix);
 
 %% Dynamic Cases
@@ -496,7 +515,7 @@ disp(stress_matrix);
 temp_str=fgetl(fid);
 temp_str=fgetl(fid);
 
-%Read in Number of elements as an integer
+%Read in Number of dynamic cases as an integer
 Ndynamic = fscanf(fid,'%i',1);
 
 %read over the next three lines, the first two which are not used for
@@ -506,19 +525,88 @@ temp_str=fgetl(fid);
 temp_str=fgetl(fid);
 
 dynamic_cases=zeros(Ndynamic,2); %initialize the dynamic cases array, which has the 2 properties which we are tracking
+natural_freqs = cell(1,Ndynamic); %initialize a cell array to store the natural frequencies found for each dynamic case
+phi = cell(1,Ndynamic); %initialize a cell array to store the eigenvectors phi found for each dynamic case
+lambda = cell(1,Ndynamic); %initialize a cell array to store the eigenvalues lambda found for each dynamic case
+
+%% HW2 part b) Define the number of natural frequency / mode shape cases
 for idyn=1:Ndynamic
- temp_ar=fscanf(fid,'%i %f %f',3); %reads in each element into a temporary array consisting of the boundary condition set to be used and the number of lowest natural frequencies we want to consider
- dynamic_cases(temp_ar(1),1:2)=temp_ar(2:3); %assigns the properties from the temporary array to the id'th row of the elements matrix
+ temp_ar=fscanf(fid,'%i %f %f %f',4); %reads in each element into a temporary array consisting of the boundary condition set to be used, the mass case to be used and and the number of lowest natural frequencies we want to consider
+ dynamic_cases(temp_ar(1),1:3)=temp_ar(2:4); %assigns the properties from the temporary array to the id'th row of the elements matrix
  ibc = dynamic_cases(idyn,1); %find the boundary condition set index ibc
- nlow = dynamic_cases(idyn,2); %find the number of lowest natural frequencies we want to concider, nlow
- Kglobal_set = Kglobal_bcs{ibc}; %store the global stiffness matrix corresponding to BC set number ibc 
- Mglobal_set = Mglobal_bcs{ibc}; %store the global mass matrix corresponding to BC set number ibc 
- [phi,lambda] = eig(Kglobal_set,Mglobal_set); %Solve the natural vibrations generalized eigenvalue problem lambda[M]{phi}=[K]{phi}
- lambdas_sorted = sort(lambda(lambda>0)); %Sort the lambda array from lowest to highest and eliminate zeros
+ imcase = dynamic_cases(idyn,2); %find the mass case set id
+ nlow = dynamic_cases(idyn,3); %find the number of lowest natural frequencies we want to concider, nlow
+ Kglobal_set = Kglobal_bcs{ibc}; %store the global stiffness matrix corresponding to BC set number ibc (SPCs already applied)
+ Mglobal_set = Mglobal_masscases{imcase}; %store the global mass matrix corresponding to mass set number imcase (no need to apply SPCs since matrix is diagonal and thus decouples SPC'ed dofs from the rest)
+
+ % Hack to eliminate decoupled frequencies corresponding to SPCed dofs that are in the range of frequencies of the constrained structure (they do not represent frequencies of the constrained structure and are just a consequence of the trick by which we imposed SPCs.
+ temp_boundary=BCdofID(1:n_dof,ibc); %store the vector of the current boundary condition set
+ for i=1:n_dof
+     diag_elem=Kglobal_set(i,i); %store the diagonal element i,i of the global stiffness matrix for this boundary condition set
+     if temp_boundary(i)==0 
+         Kglobal_set(i,i)=10000*Kglobal_set(i,i); %multiply the i,i diagonal element of the stiffness matrix by 10000 to move it out of our frequency range of interest
+     end
+ end
+ 
+ [phi_case,lambda_case] = eig(Kglobal_set,Mglobal_set); %Solve the natural vibrations generalized eigenvalue problem lambda[M]{phi}=[K]{phi}
+ lambdas_sorted = sort(lambda_case(lambda_case>0)); %Sort the lambda array from lowest to highest and eliminate zeros
  natural_freqs_sorted = (lambdas_sorted.^(1/2)).*(1/2*pi); %Convert the lambdas to natural frequencies in hertz
- natural_freqs = natural_freqs_sorted(1:nlow); %Chooes the nlow lowest natural frequencies and store in a vector
+ natural_freqs_case = natural_freqs_sorted(1:nlow); %Choose the nlow lowest natural frequencies and store in a vector
+ natural_freqs{idyn} = natural_freqs_case; %store the natural frequencies found for this case in the natural frequencies cell array
+ lambda{idyn} = lambda_case; %store the eigenvalue found for this case in the eigenvalue cell array
+ phi{idyn} = phi_case; %store the eigenvector found for this case in the eigenvector cell array
 end
 clear idyn; %clears out the id variable so that it doesnt mess with indexing later
+ %% HW2 part c) Analytic sensitivities with respect to cross sectional areas - static cases
+ %this has been implemented earlier in the code. Will be modularized at a future point in time
+ %% HW2 part d) Analytic sensitivities with respect to cross sectional areas - dynamic cases
+%read over the next two lines, the first which is not used for
+%anything other than formatting and last being the one we want
+temp_str=fgetl(fid);
+temp_str=fgetl(fid);
 
+%Read in sensitivity flag as an integer
+sensitivityflag = fscanf(fid,'%i',1);
 
+ if sensitivityflag == 1 %Analytic sensitivities for dynamic cases will only be computed if the sensitivity flag is 1 within the input deck
+    dlambda_dA = cell(1,Ndynamic); %Initialize a cell array to hold the dlambda/dA's computed for each dynamic case
+    for idyn = 1:Ndynamic
+    dlambda_dA_case = cell(1,Nelements); %Initialize a cell array to hold the dlambda/dA computed for each element in this dynamic case
+    for iel = 1:Nelements
+        numerator = (phi_case.')*(dK_dA{iel}-(lambda_case*(dM_dA{iel})))*phi_case;
+        denominator = (phi_case.')*Mglobal_set*phi_case;
+        dlambda_dA_el = numerator/denominator; %calculate the analytic sensitivity for this element
+         dlambda_dA_case{iel} = dlambda_dA_el; %store the computed analytic sensitivity 
+    end
+  
+     dlambda_dA{idyn} = dlambda_dA_case; %store the analytic sensitivity computed for this case in the dlambda/dA cell array
+    end
+    clear idyn; %clears out the id variable so that it doesnt mess with indexing later
+    clear iel; %clears out the id variable so that it doesnt mess with indexing later
+ end
+%% HW2 Part e) Truss member buckling
 
+g_buckling = zeros(Nelements,Nstatic); %initialize matrix to hold buckling constraint values for all elements and static load cases
+for ist = 1:Nstatic
+    g_buckling_case = zeros(Nelements,1); %initialize vector to hold buckling constraint values for each element
+    for iel = 1:Nelements
+      g_buckling_el = -1-stress_matrix(iel,ist)*((4*l(iel,1)^2)/(pi*E(iel,1)*A(iel,1))); %compute buckling criterion (if this is less than or equal to zero, buckling occurs)
+      g_buckling_case(iel,1) = g_buckling_el; %store the buckling constraint value for this element into the larger vector
+    end
+    
+    dgbuckling_dAj = zeros(Nelements); %initialize array to store sensitivities of buckling constraints in all elements with respect to areas of all elements
+    %compute sensitivity of buckling constraints 
+    for ieli = 1:Nelements
+        for ielj = 1:Nelements
+            if ielj == ieli %the second term in the sensitivity equation appears only when calculating the sensitivity of a buckling constraint in an element wrt the area of the same element
+                dgbucklingi_dAj_ielj = (dsigma_dA{ist}(1,ielj)*((4*l(ieli,1)^2)/(pi*E(ieli,1)*A(ieli,1))))+(stress_matrix(ieli,ist)*((4*l(ieli,1)^2)/(pi*E(ieli,1)*(A(ielj,1)^2))));
+            else
+                dgbucklingi_dAj_ielj = dsigma_dA{ist}(1,ielj)*((4*l(ieli,1)^2)/(pi*E(ieli,1)*A(ieli,1)));
+            end
+            dgbuckling_dAj_ieli(ielj) = dgbucklingi_dAj_ielj; %store buckling constraints in one element with respect to areas of all elements
+        end 
+        dgbuckling_dAj(1:Nelements,ieli) = dgbuckling_dAj_ieli; %store buckling constraints in all elements with respect to areas of all elements
+    end
+            
+    g_buckling(1:Nelements,ist) = g_buckling_case; %store the buckling constraint values for this static load case into the larger matrix
+end
