@@ -1,9 +1,4 @@
-%% Truss FE code for 2D structures
-% AA 538 Introduction to Structural Optimization
-% Shreyas Sudhakar
-
-%% Clearing all previous data in workspace
-clear; 
+function [g_buckling_norm, stress_norm, dgbuckling_dAj, dsigma_dA] = finiteelement(design_variables,Nvars)
 
 %% Define filename of input deck
 file_name = 'input.txt';
@@ -14,6 +9,13 @@ type (file_name);
 %% Read in input deck and store its values
 [Nnodes,n_dof,nodes,Nmaterials,materials,Nelements,elements,NconcM,concmasses,Nforcecases,forcecases,NBCsets,BCdofID,Nstatic,static_load,Nmasscases,masscases,Ndynamic,dynamic_cases,sensitivityflag] = inputs(file_name);
  
+%% Replace nominal design values with optimizer design values
+if isempty(design_variables)
+    display('Optimizer is being run with an empty input argument. Quantities will be computed for nominal design variable values.') 
+else
+    display('Optimizing against design variables specified in optimizer input deck.') 
+    %Optimization has not been implemented yet.
+end
 %% Defines the degrees of freedom and associates each dof with a node and a direction
 dof_index = dofproperties(n_dof);
 
@@ -39,10 +41,10 @@ force_inputs = forceinputs(n_dof,Nstatic,static_load,forcecases,BCdofID);
 u = solvedisplacement(n_dof,Nstatic,static_load,force_inputs,Kglobal_bcs);
 
 %% Compute and display the static solution (Stresses in each element)
-stress_matrix = solvestress(Nelements,Nstatic,n_dof,c,forcecases,BCdofID,elements,nodes,dof_index,materials,u);
+stress = solvestress(Nelements,Nstatic,n_dof,c,forcecases,BCdofID,elements,nodes,dof_index,materials,u);
 
 disp('The stresses in each element in PSI are displayed below in order of element number (vertically) and load case (horizontally)');
-disp(stress_matrix);
+disp(stress);
 
 %% Generate mass matrix for the unconstrained problem for each mass case 
 Mglobal_masscases = MwithCases(Nmasscases,Mglobal,masscases,concmasses,dof_index);
@@ -51,9 +53,15 @@ Mglobal_masscases = MwithCases(Nmasscases,Mglobal,masscases,concmasses,dof_index
 [natural_freqs, phi, lambda] = solvedynamic(Ndynamic,dynamic_cases,Kglobal_bcs,Mglobal_masscases,n_dof);
 
 %% Create buckling constraints for truss members
-g_buckling = buckling(n_dof,Nelements,elements,nodes,dof_index,materials,Nstatic,stress_matrix);
+g_buckling = buckling(n_dof,Nelements,elements,nodes,dof_index,materials,Nstatic,stress);
+
+%% Normalize the objective function and buckling constraints
+stress_norm = normc(stress);
+g_buckling_norm = normc(g_buckling);
 
 %% Compute analytic sensitivities
-if sensitivityflag == 1 %Analytic sensitivities for will only be computed if the sensitivity flag is 1 within the input deck
-    [dK_dA,dsigma_dA,dF_dA,dM_dA,dlambda_dA,dgbuckling_dAj] = sensitivities(n_dof,Nelements,elements,nodes,dof_index,materials,Kellocal_elements,T,Nstatic,u,static_load,Kglobal_bcs,c,Melglobal_elements,Ndynamic,phi,stress_matrix);
+if sensitivityflag == 1 | nargout >2 %Analytic sensitivities for will only be computed if the sensitivity flag is 1 within the input deck, or the optimizer code calling this function requests analytical sensitivities
+    [dK_dA,dsigma_dA,dF_dA,dM_dA,dlambda_dA,dgbuckling_dAj] = sensitivities(n_dof,Nelements,elements,nodes,dof_index,materials,Kellocal_elements,T,Nstatic,u,static_load,Kglobal_bcs,c,Melglobal_elements,Ndynamic,phi,stress);
+end
+
 end

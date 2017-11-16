@@ -1,4 +1,4 @@
- function [dK_dA,dsigma_dA,dF_dA,dM_dA,dlambda_dA,dgbuckling_dAj] = sensitivities(n_dof,Nelements,elements,nodes,dof_index,materials,Kellocal_elements,T,Nstatic,u,static_load,Kglobal_bcs,c,Melglobal_elements,Ndynamic,phi,stress_matrix)
+ function [dK_dA,dsigma_dA,dF_dA,dM_dA,dlambda_dA,dgbuckling_dAj] = sensitivities(n_dof,Nelements,elements,nodes,dof_index,materials,Kellocal_elements,T,Nstatic,u,static_load,Kglobal_bcs,c,Melglobal_elements,Ndynamic,phi,stress)
 
  [l,theta,E,A,V,rho,m] = elementproperties(n_dof,Nelements,elements,nodes,dof_index,materials); %Compute commonly used properties for all elements 
 %% HW2 part c) Analytic sensitivities with respect to cross sectional areas - static cases
@@ -104,7 +104,7 @@ for ist = 1:Nstatic
     for ieli = 1:Nelements
         for ielj = 1:Nelements
             if ielj == ieli %the second term in the sensitivity equation appears only when calculating the sensitivity of a buckling constraint in an element wrt the area of the same element
-                dgbucklingi_dAj_ielj = (dsigma_dA{ist}(1,ielj)*((4*l(ieli,1)^2)/(pi*E(ieli,1)*A(ieli,1))))+(stress_matrix(ieli,ist)*((4*l(ieli,1)^2)/(pi*E(ieli,1)*(A(ielj,1)^2))));
+                dgbucklingi_dAj_ielj = (dsigma_dA{ist}(1,ielj)*((4*l(ieli,1)^2)/(pi*E(ieli,1)*A(ieli,1))))+(stress(ieli,ist)*((4*l(ieli,1)^2)/(pi*E(ieli,1)*(A(ielj,1)^2))));
             else
                 dgbucklingi_dAj_ielj = dsigma_dA{ist}(1,ielj)*((4*l(ieli,1)^2)/(pi*E(ieli,1)*A(ieli,1)));
             end
