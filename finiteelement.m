@@ -1,13 +1,6 @@
-function [g_buckling_norm, stress_norm, dgbuckling_dAj, dsigma_dA] = finiteelement(design_variables,Nvars)
-
-%% Define filename of input deck
-file_name = 'input.txt';
-
-%% Contents of input deck
-type (file_name);
-
+function [g_buckling_norm, stress_norm, dgbuckling_dAj, dsigma_dA] = finiteelement(design_variables,Nvars,file_name)
 %% Read in input deck and store its values
-[Nnodes,n_dof,nodes,Nmaterials,materials,Nelements,elements,NconcM,concmasses,Nforcecases,forcecases,NBCsets,BCdofID,Nstatic,static_load,Nmasscases,masscases,Ndynamic,dynamic_cases,sensitivityflag] = inputs(file_name);
+[Nnodes,n_dof,nodes,Nmaterials,materials,Nelements,elements,NconcM,concmasses,Nforcecases,forcecases,NBCsets,BCdofID,Nstatic,static_load,Nmasscases,masscases,Ndynamic,dynamic_cases,sensitivityflag,~,~] = inputs(file_name);
  
 %% Replace nominal design values with optimizer design values
 if isempty(design_variables)
