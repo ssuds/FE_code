@@ -13,7 +13,7 @@
 #Material Properties
 #id	E	sigma_yt	sigma_yc	rho
 1 10000000 25000 25000 0.1
-2 10000000 75000 75000 0.1
+2 10000000 37500 37500 0.1
 #Number of elements
 10
 #element properties
@@ -29,12 +29,10 @@
 9 3 2 2 3.68
 10 4 1 1 0.14
 #Number of concentrated non structural masses
-3
+1
 #concentrated mass properties
 #id	mass	node
-1 0.125 1
-2 0.043 3
-3 0.016 5
+1 0 1
 #Number of static force cases
 2
 #force case properties
@@ -47,11 +45,10 @@
 #id	boundary_condition(free 1 or constrained 0)
 1 1 1 1 1 1 1 1 1 0 0 0 0
 #Number of static load cases
-2
+1
 #static load case properties
 #id	forcevector_index	boundary_condition_case		
 1 1 1
-2 2 1
 #Number of natural vibrations cases
 2
 #dynamic load case properties
@@ -59,24 +56,9 @@
 1 1 1 2
 2 1 1 3
 #Number of non-structural mass cases
-2
+1
 #Mass case properties
 #id	conc_mass_ids	
-1 1 2 3
-2 2 3
+1 1
 #Should analytic sensitivities be computed (1 if yes, 0 if no)
 1
-#Number of design variables
-10
-#design variables for each element
-#element_id AisDV
-1 1
-2 1
-3 1
-4 1
-5 1
-6 1
-7 1
-8 1
-9 1
-10 1

@@ -8,16 +8,19 @@ clear;
 %% Define filename of input deck
 file_name = 'input.txt';
 
-%% Contents of input deck
-type (file_name);
-
 %% Read in input deck and store its values
-[Nnodes,n_dof,nodes,Nmaterials,materials,Nelements,elements,NconcM,concmasses,Nforcecases,forcecases,NBCsets,BCdofID,Nstatic,static_load,Nmasscases,masscases,Ndynamic,dynamic_cases,sensitivityflag,Nvars,design_variables] = inputs(file_name);
+[Nnodes,n_dof,nodes,Nmaterials,materials,Nelements,elements,NconcM,concmasses,Nforcecases,forcecases,NBCsets,BCdofID,Nstatic,static_load,Nmasscases,masscases,Ndynamic,dynamic_cases,sensitivityflag] = inputs(file_name);
 
-i = 0;
-while i < 10
-    %% HW 3 Part 1
-    [g_buckling, stress, dgbuckling_dAj, dsigma_dA] = finiteelement(design_variables, Nvars, file_name); %call the finite element code, provide the vector of design variables and recieve normalized vectors of constraints and the objective function, and also the analytic sensitivities of these quantities
-    optimizer(g_buckling, stress, dgbuckling_dAj, dsigma_dA, file_name);
-    i = i + 1;
+prompt = 'What mode would you like to run in?'; %0 to display the contents of the input deck, 1 for Finite Element Analysis of nominal values, 2 for constrained optimization to minimize mass in Brute Force mode
+mode = input(prompt)
+
+if mode == 1
+    stress = finiteelement(file_name,[]);
+elseif mode == 2
+    A_opt = optimizer(file_name, [], []);
+elseif mode == 0
+    %% Contents of input deck
+    type (file_name);
+else
+    disp('This is not a valid mode! Please run again with correct input.');
 end

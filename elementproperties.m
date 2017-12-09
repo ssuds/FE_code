@@ -1,10 +1,12 @@
-function [l,theta,E,A,V,rho,m] = elementproperties(n_dof,Nelements,elements,nodes,dof_index,materials)
+function [l,theta,E,A,V,rho,m,sigma_yt,sigma_yc] = elementproperties(n_dof,Nelements,elements,nodes,dof_index,materials)
 % ELEMENTPROPERTIES  Computes commonly used properties for all elements in a truss structure.
 %   
 
 l = zeros(Nelements,1); %initialize empty length matrix to store lengths of each element
 theta = zeros(Nelements,1); %initialize empty length matrix to store angle theta of each element
 E = zeros(Nelements,1); %initialize empty matrix to store E of each element
+sigma_yt = zeros(Nelements,1); %initialize empty matrix to store tensile yield stress allowable of each element
+sigma_yc = zeros(Nelements,1); %initialize empty matrix to store compressive yield stress allowable of each element
 A = zeros(Nelements,1); %intiialize empty matrix to store A of each element
 V = zeros(Nelements,1); %intiialize empty matrix to store V of each element
 rho = zeros(Nelements,1); %initialize empty length matrix to store lengths of each element
@@ -29,6 +31,10 @@ for iel=1:Nelements
     %Find material properties based on the id_material
     E_el=materials(id_material,1);
     E(iel,1) = E_el; %store E of this element in the E vector
+    sigma_yt_el=materials(id_material,2);
+    sigma_yt(iel,1) = sigma_yt_el; %store tensile yield stress allowable of this element in the sigma_yt vector
+    sigma_yc_el=materials(id_material,3);
+    sigma_yc(iel,1) = sigma_yc_el; %store compressive yield stress allowable of this element in the sigma_yc vector
     rho_el=materials(id_material,4);
     rho(iel,1) = rho_el; %store the density rho of this element 
     %Find the cross sectional area of the element A-iel
