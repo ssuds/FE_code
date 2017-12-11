@@ -16,8 +16,12 @@ mode = input(prompt)
 
 if mode == 1
     stress = finiteelement(file_name,[]);
+    disp('The stresses in each element in PSI are displayed below in order of element number (vertically) and load case (horizontally)');
+    disp(stress);
 elseif mode == 2
     A_opt = optimizer(file_name, [], []);
+    disp('The optimal areas for each element in square inches are displayed below in order of element number (vertically) and load case (horizontally)');
+    display(A_opt);
 elseif mode == 0
     %% Contents of input deck
     type (file_name);

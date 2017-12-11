@@ -8,7 +8,7 @@ for ist=1:Nstatic
     iforce = static_load(ist,1); %find the force set index iforce
     force = force_inputs(1:n_dof,iforce); %store the modified force vector associated to the index
     Kglobal_set = Kglobal_bcs{ibc}; %store the global stiffness matrix corresponding to BC set number ibc 
-    u_case = lsqr(Kglobal_set,force); %Solve [K]{u} = {F} for {u}, lsqr function is used since K is sparse
+    u_case = mldivide(Kglobal_set,force); %Solve [K]{u} = {F} for {u}, lsqr function is used since K is sparse
     u(1:n_dof,ist)=u_case; %store the displacement for this load case in the Nstatic column of the displacement matrix
 end
 

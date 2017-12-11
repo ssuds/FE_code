@@ -5,9 +5,12 @@ function A_opt = optimizer(file_name, dgbuckling_dAj, dsigma_dA)
 
 %% Optimization with fmincon
 
-min = [0.1 0.1 0.1 0.1 0.1 0.1 0.1 0.1 0.1 0.1]; %Minimum allowable gauge for each element in the problem
+min_gauge = 0.10; %Minimum allowable gauge for each element in the problem
+min = min_gauge.*ones(1,Nelements);
 
-[A_optimized,stress_optimized] = fmincon(@(A_opt)structure_mass(file_name,A_opt),A,[],[],[],[],min,[],@(A_opt)constraints(file_name,A_opt,0));
+[A_optimized,stress_optimized,exitflag,output] = fmincon(@(A_opt)structure_mass(file_name,A_opt),A,[],[],[],[],min,[],@(A_opt)constraints(file_name,A_opt,0));
 
-A_opt = A_optimized
+A_opt = A_optimized;
+
+display(output);
 end

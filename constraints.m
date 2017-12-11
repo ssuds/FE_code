@@ -16,7 +16,7 @@ if ibuckling == 0 % Buckling constraints are not desired, return only stress con
     %% Normalize the constraints
     g_stress_allowables_norm = normc(g_stress_allowables);
     %% Reshape constraints into a vector
-    g = g_stress_allowables(:) %Reshape the constraints matrix into a vector
+    g = g_stress_allowables(:); %Reshape the constraints matrix into a vector
 elseif ibuckling == 1 % Buckling constraints are desired, return both stress and buckling constraints in one constraint vector
     %% Create stress constraints
     g_stress_allowables = stress_allowables(n_dof,Nelements,elements,nodes,dof_index,materials,Nstatic,stress);

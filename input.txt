@@ -13,21 +13,21 @@
 #Material Properties
 #id	E	sigma_yt	sigma_yc	rho
 1 10000000 25000 25000 0.1
-2 10000000 37500 37500 0.1
+2 10000000 75000 75000 0.1
 #Number of elements
 10
 #element properties
 #element_id	id_node1	id_node2	id_material	A
-1 5 3 1 7.90
-2 3 1 1 0.10
-3 6 4 1 8.10
-4 4 2 1 3.90
-5 3 4 1 0.10
-6 1 2 1 0.10
-7 5 4 1 5.80
-8 6 3 1 5.51
-9 3 2 2 3.68
-10 4 1 1 0.14
+1 5 3 1 5
+2 3 1 1 5
+3 6 4 1 5
+4 4 2 1 5
+5 3 4 1 5
+6 1 2 1 5
+7 5 4 1 5
+8 6 3 1 5
+9 3 2 2 5
+10 4 1 1 5
 #Number of concentrated non structural masses
 1
 #concentrated mass properties
